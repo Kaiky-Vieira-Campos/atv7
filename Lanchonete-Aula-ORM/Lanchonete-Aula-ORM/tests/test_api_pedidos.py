@@ -53,3 +53,29 @@ async def test_fluxo_completo_pedido(client):
     r3 = await client.post(f"/lanchonete/pedidos/{cod_pedido}/finalizar")
     assert r3.status_code == 200
     assert r3.json()["total"] == 29.0
+
+
+async def test_buscar_pedido_por_codigo(client):
+    await client.post("/clientes", json={"cpf": "11122233344", "nome": "Cliente X"})
+    await client.post("/produtos", json={"codigo": 1, "valor": 10, "tipo": 1, "desconto_percentual": 10})
+
+    r = await client.post("/lanchonete/pedidos", json={"cpf": "11122233344", "cod_produto": 1, "qtd_max_produtos": 10})
+    assert r.status_code == 200
+    cod_pedido = r.json()["codigo"]
+
+    response = await client.get(f"/lanchonete/pedidos/{cod_pedido}")
+    assert response.status_code == 200
+    assert response.json()["cpf"] == "11122233344"
+
+
+async def test_pedido_limite_atingido_retornar_400(client):
+    await client.post("/clientes", json={"cpf": "11122233344", "nome": "Cliente X"})
+    await client.post("/produtos", json={"codigo": 1, "valor": 10, "tipo": 1, "desconto_percentual": 10})
+    await client.post("/produtos", json={"codigo": 2, "valor": 20, "tipo": 2, "desconto_percentual": 10})
+
+    r = await client.post("/lanchonete/pedidos", json={"cpf": "11122233344", "cod_produto": 1, "qtd_max_produtos": 1})
+    assert r.status_code == 200
+    cod_pedido = r.json()["codigo"]
+
+    response = await client.put(f"/lanchonete/pedidos/{cod_pedido}/itens", json={"cod_produto": 2})
+    assert response.status_code == 400
